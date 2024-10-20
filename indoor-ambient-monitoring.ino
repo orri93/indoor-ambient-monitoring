@@ -1,27 +1,15 @@
 #include <Arduino.h>
-#include <SPI.h>
-
-/* Include header files for the Adafruit BME280 library */
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
-
-/* Include header files for the DOGS102 Display library */
-#include <dog_1701.h>
 
 /* Other include header files for miscellaneous libraries */
 #include <gatltick.h>
 
 /* Local include header files */
-#include "fonts.h"
-#include "logo.h"
+#include "types.h"
+#include "sensor.h"
+#include "display.h"
 
 /* Interval definitions */
 #define INTERVAL_SENSOR 1000
-
-/* Ambient definitions */
-#define SEALEVELPRESSURE_HPA (1013.25)
-
-#define ESP32WROOM_TEST_PIN HSPI
 
 /* ESP32-WROOM-32 SPI Pins
 
@@ -102,36 +90,21 @@
 
 */
 
-/* Pins for the BME280 sensor */
-#define PIN_BME_CSB   SS
-
-/* Pins for the DOGS102 Display */
-#define PIN_DOG_SI    13
-#define PIN_DOG_SCK   14
-#define PIN_DOG_CS    15
-#define PIN_DOG_A0    16
-#define PIN_DOG_RST   17
-
 /* Serial Speed (if undefined no serial output will be generated) */
 #define SERIAL_BAUD 9600
 
-/* Other definitions */
-#define NFB_SIZE      16
-
-/* The BME280 sensor instance */
-Adafruit_BME280 bme(PIN_BME_CSB, &SPI);
-
-/* The DOG Display instance */
-dog_1701 dog;
+/* Serial Debugging include header file */
+#ifdef SERIAL_BAUD
+#include "serialdebug.h"
+#endif
 
 /* Tick instances */
 ::gos::atl::Tick<> tick_sensor(INTERVAL_SENSOR);
 
 /* Sensor ambient value variables */
-float sensor_temperature, sensor_pressure, sensor_humidity;
+sensor_data sensordata;
 
 /* General global variables */
-static char nfb[NFB_SIZE];
 unsigned long current;
 
 void setup() {
@@ -139,30 +112,21 @@ void setup() {
   current = 0;
 
 #ifdef SERIAL_BAUD
-  Serial.begin(SERIAL_BAUD);
-  while(!Serial);
-  Serial.println("Indoor Ambient Monitoring");
-  Serial.println("Copyright 2024 Geirmundur Orri Sigurdsson");
+  serial_debug_initiate(SERIAL_BAUD);
 #endif
 
   /* Initalization of the DOG display instance */
-  /* Parameter order is CS, SI, CLK, A0, RES */
-  dog.initialize(PIN_DOG_CS, PIN_DOG_SI, PIN_DOG_SCK, PIN_DOG_A0, PIN_DOG_RST, DOGS102);
-  dog.clear();
-  dog.picture(0, 0, logo);
+  display_initiate();
 
   /* Initalization of the BME280 sensor instance */
-  pinMode(PIN_BME_CSB, OUTPUT);
-  if (bme.begin()) {
+  if (sensor_initiate()) {
 #ifdef SERIAL_BAUD
-    Serial.print("A valid BME280 sensor found with SensorID: 0x");
-    Serial.println(bme.sensorID(), 16);
+    serial_debug_sensor_success(sensor_id());
 #endif
   } else {
+    uint32_t sensorid = sensor_id();
 #ifdef SERIAL_BAUD
-    Serial.println("Could not find a valid BME280 sensor!");
-    Serial.print("SensorID: 0x");
-    Serial.println(bme.sensorID(), 16);
+    serial_debug_sensor_failure(sensorid);
 #endif
   }
 }
@@ -171,23 +135,12 @@ void loop() {
   current = millis();
 
   if (tick_sensor.is(current)) {
-    sensor_temperature = bme.readTemperature(); /* °C*/
-    sensor_pressure = bme.readPressure(); /* Pa */
-    sensor_humidity = bme.readHumidity(); /* % */
+    sensor_read(sensordata);
 
-    dtostrf(sensor_temperature, 0, 2, nfb);
-    dog.string(0, 4, font_16x32nums, nfb);
+    display_update(sensordata);
 
 #ifdef SERIAL_BAUD
-    Serial.print("Temperature = ");
-    Serial.print(sensor_temperature);
-    Serial.println(" °C");
-    Serial.print("Pressure = ");
-    Serial.print(sensor_pressure / 100.0F);
-    Serial.println(" hPa");
-    Serial.print("Humidity = ");
-    Serial.print(sensor_humidity);
-    Serial.println(" %");
+    serial_debug_sensor_data(sensordata);
 #endif
   }
 }
