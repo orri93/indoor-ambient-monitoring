@@ -23,7 +23,8 @@ void display_initiate() {
   dog.initialize(PIN_DOG_CS, PIN_DOG_SI, PIN_DOG_SCK, PIN_DOG_A0, PIN_DOG_RST, DOGS102);
   dog.contrast(DISPLAY_CONTRAST);
   dog.clear();
-  dog.picture(0, 0, logo_sun);
+  //dog.picture(0, 0, logo_sun);
+  dog.string(0, 0, font_8x16, "Connecting to WiFi");
 }
 
 void display_update(const sensor_data& sensordata) {

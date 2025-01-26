@@ -6,6 +6,7 @@
 #include "types.h"
 
 void serial_debug_initiate(long baud);
+void serial_debug_connection_success(const IPAddress& ip);
 void serial_debug_sensor_success(uint32_t sensorid);
 void serial_debug_sensor_failure(uint32_t sensorid);
 void serial_debug_sensor_data(const sensor_data& sensordata);

@@ -7,6 +7,12 @@ void serial_debug_initiate(long baud) {
   Serial.println("Copyright 2024 Geirmundur Orri Sigurdsson");
 }
 
+void serial_debug_connection_success(const IPAddress& ip) {
+  Serial.println("");
+  Serial.print("Connected to WiFi with IP: ");
+  Serial.println(ip);
+}
+
 void serial_debug_sensor_success(uint32_t sensorid) {
   Serial.print("A valid BME280 sensor found with SensorID: 0x");
   Serial.println(sensorid, 16);

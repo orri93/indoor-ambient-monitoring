@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 
+extern const byte font_6x8[];
 extern const byte font_8x16[];
 extern const byte font_16x32nums[];
 

@@ -1,5 +1,8 @@
 #include <Arduino.h>
 
+#include <WiFi.h>
+#include <PubSubClient.h>
+
 /* Other include header files for miscellaneous libraries */
 #include <gatltick.h>
 
@@ -7,9 +10,11 @@
 #include "types.h"
 #include "sensor.h"
 #include "display.h"
+#include "secrets.h"
 
 /* Interval definitions */
 #define INTERVAL_SENSOR 1000
+#define INTERVAL_REPORT 60000
 
 /* ESP32-WROOM-32 SPI Pins
 
@@ -91,12 +96,16 @@
 */
 
 /* Serial Speed (if undefined no serial output will be generated) */
-#define SERIAL_BAUD 9600
+#define SERIAL_BAUD 115200
 
 /* Serial Debugging include header file */
 #ifdef SERIAL_BAUD
 #include "serialdebug.h"
 #endif
+
+/* MQTT instances */
+WiFiClient wificlient;
+PubSubClient psclient(wificlient);
 
 /* Tick instances */
 ::gos::atl::Tick<> tick_sensor(INTERVAL_SENSOR);
@@ -106,6 +115,8 @@ sensor_data sensordata;
 
 /* General global variables */
 unsigned long current;
+
+void connect();
 
 void setup() {
   /* Initalize general global variables */
@@ -118,8 +129,25 @@ void setup() {
   /* Initalization of the DOG display instance */
   display_initiate();
 
+  /* Initalize the WiFi connection */
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+#ifdef SERIAL_BAUD
+    Serial.print(".");
+#endif
+  }
+
+  /* Configuring the MQTT client */
+  psclient.setServer(MQTT_SERVER, 1883);
+  //psclient.setCallback(callback);
+
+#ifdef SERIAL_BAUD
+//serial_debug_connection_success(WiFi.localIP());
+#endif
+
   /* Initalization of the BME280 sensor instance */
-  if (sensor_initiate()) {
+  if (sensor_initiate(sensordata)) {
 #ifdef SERIAL_BAUD
     serial_debug_sensor_success(sensor_id());
 #endif
@@ -132,6 +160,12 @@ void setup() {
 }
 
 void loop() {
+  /* Connect to the MQTT server if disconnected */
+  if (!psclient.connected()) {
+    connect();
+  }
+  psclient.loop();
+
   current = millis();
 
   if (tick_sensor.is(current)) {
@@ -142,5 +176,15 @@ void loop() {
 #ifdef SERIAL_BAUD
     serial_debug_sensor_data(sensordata);
 #endif
+  }
+}
+
+void connect() {
+  while (!psclient.connected()) {
+    if (psclient.connect(MQTT_CLIENT)) {
+      psclient.subscribe("inTopic");
+    } else {
+      delay(5000);
+    }
   }
 }
