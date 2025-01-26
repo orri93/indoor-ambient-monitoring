@@ -24,7 +24,7 @@ void display_initiate() {
   dog.contrast(DISPLAY_CONTRAST);
   dog.clear();
   //dog.picture(0, 0, logo_sun);
-  dog.string(0, 0, font_8x16, "Connecting to WiFi");
+  dog.string(0, 0, font_6x8, "Connecting to WiFi");
 }
 
 void display_update(const sensor_data& sensordata) {
