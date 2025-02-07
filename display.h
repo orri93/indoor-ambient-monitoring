@@ -14,6 +14,12 @@
 #define PIN_DOG_RST   17
 
 void display_initiate();
-void display_update(const sensor_data& sensordata);
+void display_wifi_connecting();
+void display_wifi_connection_success(const IPAddress& ip);
+void display_update(
+  const int& wifi_status,
+  const int& mqtt_status,
+  const IPAddress& ip,
+  const sensor_data& sensordata);
 
 #endif

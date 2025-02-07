@@ -8,13 +8,17 @@
 
 /* Local include header files */
 #include "types.h"
+#include "constdef.h"
 #include "sensor.h"
 #include "display.h"
 #include "secrets.h"
 
 /* Interval definitions */
-#define INTERVAL_SENSOR 1000
-#define INTERVAL_REPORT 60000
+#define INTERVAL_WIFI_CONNECT  5000
+#define INTERVAL_MQTT_CONNECT  5000
+#define INTERVAL_SENSOR        1000
+#define INTERVAL_REPORT        1000
+#define INTERVAL_DISPLAY        100
 
 /* ESP32-WROOM-32 SPI Pins
 
@@ -108,14 +112,21 @@ WiFiClient wificlient;
 PubSubClient psclient(wificlient);
 
 /* Tick instances */
+::gos::atl::Tick<> tick_wifi_connect(INTERVAL_WIFI_CONNECT);
+::gos::atl::Tick<> tick_mqtt_connect(INTERVAL_MQTT_CONNECT);
 ::gos::atl::Tick<> tick_sensor(INTERVAL_SENSOR);
+::gos::atl::Tick<> tick_report(INTERVAL_REPORT);
+::gos::atl::Tick<> tick_display(INTERVAL_DISPLAY);
 
 /* Sensor ambient value variables */
 sensor_data sensordata;
 
 /* General global variables */
 unsigned long current;
+unsigned int wifi_status = CONNECTION_STATUS_UNKNOWN;
+unsigned int mqtt_status = CONNECTION_STATUS_UNKNOWN;
 
+void callback(char* topic, byte* payload, unsigned int length);
 void connect();
 
 void setup() {
@@ -130,6 +141,10 @@ void setup() {
   display_initiate();
 
   /* Initalize the WiFi connection */
+#ifdef SERIAL_BAUD
+  serial_debug_wifi_connecting();
+#endif
+  display_wifi_connecting();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while(WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -137,14 +152,17 @@ void setup() {
     Serial.print(".");
 #endif
   }
-
-  /* Configuring the MQTT client */
-  psclient.setServer(MQTT_SERVER, 1883);
-  //psclient.setCallback(callback);
+  wifi_status = CONNECTION_STATUS_CONNECTED;
 
 #ifdef SERIAL_BAUD
-//serial_debug_connection_success(WiFi.localIP());
+  serial_debug_wifi_connection_success(WiFi.localIP());
 #endif
+  display_wifi_connection_success(WiFi.localIP());
+
+  /* Configuring the MQTT client */
+  mqtt_status = CONNECTION_STATUS_UNKNOWN;
+  psclient.setServer(MQTT_SERVER, MQTT_PORT);
+  psclient.setCallback(callback);
 
   /* Initalization of the BME280 sensor instance */
   if (sensor_initiate(sensordata)) {
@@ -160,31 +178,86 @@ void setup() {
 }
 
 void loop() {
-  /* Connect to the MQTT server if disconnected */
-  if (!psclient.connected()) {
-    connect();
+  current = millis();
+
+  /* Maintain the WiFi connection */
+  if (WiFi.status() == WL_CONNECTED) {
+    if (wifi_status != CONNECTION_STATUS_CONNECTED) {
+#ifdef SERIAL_BAUD
+      serial_debug_wifi_reestablished_connection(WiFi.localIP());
+#endif
+      wifi_status = CONNECTION_STATUS_CONNECTED;
+    }
+  } else {
+    if (wifi_status == CONNECTION_STATUS_CONNECTED) {
+#ifdef SERIAL_BAUD
+      serial_debug_wifi_lost_connection();
+#endif
+      wifi_status = CONNECTION_STATUS_DISCONNECTED;
+    }
+    if (tick_wifi_connect.is(current)) {
+#ifdef SERIAL_BAUD
+      serial_debug_wifi_lost_connection();
+#endif
+      WiFi.disconnect();
+      WiFi.reconnect();
+    }
+  }
+
+  /* Maintain the MQTT connection */
+  if (psclient.connected()) {
+    if (mqtt_status == CONNECTION_STATUS_DISCONNECTED) {
+#ifdef SERIAL_BAUD
+      serial_debug_mqtt_reestablished_connection();
+#endif
+    }
+    mqtt_status = CONNECTION_STATUS_CONNECTED;
+  } else {
+    if (mqtt_status == CONNECTION_STATUS_CONNECTED) {
+#ifdef SERIAL_BAUD
+      serial_debug_mqtt_lost_connection();
+#endif
+      mqtt_status = CONNECTION_STATUS_DISCONNECTED;
+    }
+    if (tick_mqtt_connect.is(current)) {
+      connect();
+    }
   }
   psclient.loop();
 
-  current = millis();
-
   if (tick_sensor.is(current)) {
     sensor_read(sensordata);
-
-    display_update(sensordata);
-
 #ifdef SERIAL_BAUD
     serial_debug_sensor_data(sensordata);
 #endif
   }
+
+  if (tick_report.is(current)) {
+    if (mqtt_status == CONNECTION_STATUS_CONNECTED) {
+      //report();
+    }
+  }
+
+  if (tick_display.is(current)) {
+    display_update(wifi_status, mqtt_status, WiFi.localIP(), sensordata);
+  }
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+#ifdef SERIAL_BAUD
+  Serial.print("Message arrived on topic: ");
+  Serial.println(topic);
+#endif
 }
 
 void connect() {
-  while (!psclient.connected()) {
-    if (psclient.connect(MQTT_CLIENT)) {
-      psclient.subscribe("inTopic");
-    } else {
-      delay(5000);
-    }
+#ifdef SERIAL_BAUD
+  serial_debug_mqtt_connecting();
+#endif
+  if (psclient.connect(MQTT_CLIENT, MQTT_USERNAME, MQTT_PASSWORD)) {
+#ifdef SERIAL_BAUD
+    serial_debug_mqtt_connection_success();
+#endif
+    psclient.subscribe("inTopic");
   }
 }
