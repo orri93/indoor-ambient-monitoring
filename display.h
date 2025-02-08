@@ -1,6 +1,8 @@
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
+#include <Arduino.h>
+
 #include "types.h"
 
 /* Display definitions */
@@ -14,6 +16,7 @@
 #define PIN_DOG_RST   17
 
 void display_initiate();
+void display_sensor_failure(uint32_t sensorid);
 void display_wifi_connecting();
 void display_wifi_connection_success(const IPAddress& ip);
 void display_update(

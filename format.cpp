@@ -8,6 +8,12 @@
 static char nfb[NFB_SIZE];
 static char fb[FB_SIZE];
 
+const char* format_value(float value) {
+  dtostrf(value, 0, 1, nfb);
+  sprintf(fb, "%s", nfb);
+  return fb;
+}
+
 const char* format_temperature(float temperature) {
   dtostrf(temperature, 0, 1, nfb);
   sprintf(fb, "%s C", nfb);

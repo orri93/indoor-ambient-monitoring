@@ -9,15 +9,16 @@
 /* Local include header files */
 #include "types.h"
 #include "constdef.h"
+#include "secrets.h"
 #include "sensor.h"
 #include "display.h"
-#include "secrets.h"
+#include "reporting.h"
 
 /* Interval definitions */
 #define INTERVAL_WIFI_CONNECT  5000
 #define INTERVAL_MQTT_CONNECT  5000
 #define INTERVAL_SENSOR        1000
-#define INTERVAL_REPORT        1000
+#define INTERVAL_REPORT       60000
 #define INTERVAL_DISPLAY        100
 
 /* ESP32-WROOM-32 SPI Pins
@@ -140,6 +141,22 @@ void setup() {
   /* Initalization of the DOG display instance */
   display_initiate();
 
+  /* Initalization of the BME280 sensor instance */
+  if (sensor_initiate(sensordata)) {
+#ifdef SERIAL_BAUD
+    serial_debug_sensor_success(sensor_id());
+#endif
+  } else {
+    uint32_t sensorid = sensor_id();
+#ifdef SERIAL_BAUD
+    serial_debug_sensor_failure(sensorid);
+#endif
+    display_sensor_failure(sensorid);
+    while(1) {
+      delay(1000);
+    }
+  }
+
   /* Initalize the WiFi connection */
 #ifdef SERIAL_BAUD
   serial_debug_wifi_connecting();
@@ -164,17 +181,8 @@ void setup() {
   psclient.setServer(MQTT_SERVER, MQTT_PORT);
   psclient.setCallback(callback);
 
-  /* Initalization of the BME280 sensor instance */
-  if (sensor_initiate(sensordata)) {
-#ifdef SERIAL_BAUD
-    serial_debug_sensor_success(sensor_id());
-#endif
-  } else {
-    uint32_t sensorid = sensor_id();
-#ifdef SERIAL_BAUD
-    serial_debug_sensor_failure(sensorid);
-#endif
-  }
+  /* Initalize the reporting */
+  report_initiate(&psclient);
 }
 
 void loop() {
@@ -225,6 +233,7 @@ void loop() {
   }
   psclient.loop();
 
+  /* Read the sensor data */
   if (tick_sensor.is(current)) {
     sensor_read(sensordata);
 #ifdef SERIAL_BAUD
@@ -234,10 +243,11 @@ void loop() {
 
   if (tick_report.is(current)) {
     if (mqtt_status == CONNECTION_STATUS_CONNECTED) {
-      //report();
+      report_sensor_data(sensordata);
     }
   }
 
+  /* Update the display */
   if (tick_display.is(current)) {
     display_update(wifi_status, mqtt_status, WiFi.localIP(), sensordata);
   }
@@ -258,6 +268,6 @@ void connect() {
 #ifdef SERIAL_BAUD
     serial_debug_mqtt_connection_success();
 #endif
-    psclient.subscribe("inTopic");
+    psclient.subscribe(REPORTING_TOPIC DEVICE_ID "/control");
   }
 }

@@ -26,6 +26,14 @@ void display_initiate() {
   dog.contrast(DISPLAY_CONTRAST);
 }
 
+void display_sensor_failure(uint32_t sensorid) {
+  String failure_string = String(sensorid, HEX);
+  strcpy(buffer, "Sensor failure ");
+  strcat(buffer, failure_string.c_str());
+  dog.clear();
+  dog.string(0, 0, font_6x8, buffer);
+}
+
 void display_wifi_connecting() {
   dog.clear();
   dog.string(0, 0, font_6x8, "Connecting...");
@@ -43,8 +51,6 @@ void display_update(
   const sensor_data& sensordata) {
 
   dog.clear();
-
-  buffer[0] = 0x00;
 
   if (wifi_status == CONNECTION_STATUS_CONNECTED) {
     strcpy(buffer, ip.toString().c_str());
