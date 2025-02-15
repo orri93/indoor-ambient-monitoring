@@ -2,14 +2,14 @@
 
 #include "format.h"
 
-#define NFB_SIZE 16
-#define FB_SIZE  32
+#define NFB_SIZE 32
+#define FB_SIZE  64
 
 static char nfb[NFB_SIZE];
 static char fb[FB_SIZE];
 
 const char* format_value(float value) {
-  dtostrf(value, 0, 1, nfb);
+  dtostrf(value, 0, 4, nfb);
   sprintf(fb, "%s", nfb);
   return fb;
 }

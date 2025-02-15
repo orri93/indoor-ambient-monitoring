@@ -1,5 +1,8 @@
 #include "serialdebug.h"
+#include "convert.h"
 #include "secrets.h"
+
+static float v;
 
 void serial_debug_initiate(long baud) {
   Serial.begin(baud);
@@ -59,9 +62,12 @@ void serial_debug_sensor_data(const sensor_data& sensordata) {
   Serial.print("Temperature = ");
   Serial.print(sensordata.temperature);
   Serial.println(" °C");
+
+  v = patohpa(sensordata.pressure);
   Serial.print("Pressure = ");
-  Serial.print(sensordata.pressure / 100.0F);
+  Serial.print(v);
   Serial.println(" hPa");
+
   Serial.print("Humidity = ");
   Serial.print(sensordata.humidity);
   Serial.println(" %");
